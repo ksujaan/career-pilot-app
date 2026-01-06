@@ -101,7 +101,7 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
-    const model = 'googleai/gemini-2.0-flash-001';
+    const model = 'googleai/gemma-3-1b-it';
     try {
         const { output } = await fetchWithRetry(() => extractJobDescriptionPrompt(input, { model }));
         return output || { jobTitle: "", companyName: "", jobDescription: "" };

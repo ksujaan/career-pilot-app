@@ -55,7 +55,6 @@ const extractJobDescriptionPrompt = ai.definePrompt({
   name: 'extractJobDescriptionPrompt',
   input: {schema: ExtractJobDescriptionInputSchema},
   tools: [fetchWebsiteContent],
-  output: { format: 'json' },
   prompt: `You are an expert web scraper and data extractor. Your task is to extract the job description from the provided URL. Use the fetchWebsiteContent tool to get the website's content.
 
   Job URL: {{{jobUrl}}}
@@ -77,9 +76,12 @@ const extractJobDescriptionFlow = ai.defineFlow(
     try {
         const output = result.output();
         if (output) {
-            return ExtractJobDescriptionOutputSchema.parse(output);
+            // The output from the prompt is a string that we expect to be JSON
+            const parsed = JSON.parse(output as string);
+            return ExtractJobDescriptionOutputSchema.parse(parsed);
         }
     } catch (e) {
+        console.error("Error parsing job description JSON:", e);
         // Ignore parsing errors and fall through to the default
     }
     return { jobDescription: "" };

@@ -54,7 +54,7 @@ export function LoginButton() {
 
   if (!user) {
     return (
-      <Button onClick={handleSignIn} variant="outline" className="w-full justify-start">
+      <Button onClick={handleSignIn} className="w-full justify-start">
         <LogIn className="mr-2 h-4 w-4" />
         Sign In with Google
       </Button>

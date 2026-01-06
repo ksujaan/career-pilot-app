@@ -19,6 +19,7 @@ import { summarizeResume } from "@/ai/flows/summarize-resume";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFirebase, useUser, useMemoFirebase, useDoc } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
+import { LoginButton } from "@/components/auth/login-button";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -128,11 +129,17 @@ export default function ProfilePage() {
             <Card className="w-full max-w-md text-center shadow-lg">
                 <CardHeader>
                     <CardTitle>Welcome to CareerPilot</CardTitle>
+                     <CardDescription>
+                        Your AI-powered job application assistant.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground mb-4">
                         Please sign in to manage your profile.
                     </p>
+                    <div className="w-full sm:w-auto sm:mx-auto">
+                        <LoginButton />
+                    </div>
                 </CardContent>
             </Card>
         </div>

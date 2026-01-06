@@ -35,6 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useFirebase, useMemoFirebase, useUser } from "@/firebase";
 import { doc, collection, setDoc, serverTimestamp } from "firebase/firestore";
 import { useDoc } from "@/firebase/firestore/use-doc";
+import { LoginButton } from "@/components/auth/login-button";
 
 const formSchema = z.object({
   companyName: z.string().min(2, "Company name is required"),
@@ -174,12 +175,17 @@ export default function NewApplicationPage() {
             <Card className="w-full max-w-md text-center shadow-lg">
                 <CardHeader>
                     <CardTitle>Welcome to CareerPilot</CardTitle>
+                    <CardDescription>
+                        Your AI-powered job application assistant.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground mb-4">
-                        Please sign in to manage your job applications.
+                        Please sign in to get started.
                     </p>
-                    {/* The login button will be in the header */}
+                    <div className="w-full sm:w-auto sm:mx-auto">
+                        <LoginButton />
+                    </div>
                 </CardContent>
             </Card>
         </div>
@@ -199,6 +205,25 @@ export default function NewApplicationPage() {
           <CardContent className="pt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                 <FormField
+                    control={form.control}
+                    name="jobUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job Post URL (LinkedIn, etc.)</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <FormControl>
+                            <Input placeholder="https://www.linkedin.com/jobs/view/..." {...field} />
+                            </FormControl>
+                            <Button type="button" onClick={handleExtractDescription} disabled={isExtracting || !form.watch('jobUrl')} variant="outline">
+                                {isExtracting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                <span className="hidden sm:inline">Extract</span>
+                            </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
@@ -227,25 +252,6 @@ export default function NewApplicationPage() {
                     )}
                   />
                 </div>
-                 <FormField
-                    control={form.control}
-                    name="jobUrl"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Job Post URL (LinkedIn, etc.)</FormLabel>
-                        <div className="flex items-center gap-2">
-                            <FormControl>
-                            <Input placeholder="https://www.linkedin.com/jobs/view/..." {...field} />
-                            </FormControl>
-                            <Button type="button" onClick={handleExtractDescription} disabled={isExtracting || !form.watch('jobUrl')} variant="outline">
-                                {isExtracting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                <span className="hidden sm:inline">Extract</span>
-                            </Button>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 <FormField
                   control={form.control}
                   name="jobDescription"

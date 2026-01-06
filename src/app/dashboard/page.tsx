@@ -33,6 +33,7 @@ import { Eye, CalendarIcon, Briefcase, Building, Loader2 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { useFirebase, useUser, useMemoFirebase, useCollection } from "@/firebase";
 import { collection, doc, updateDoc } from "firebase/firestore";
+import { LoginButton } from "@/components/auth/login-button";
 
 const statusColors: Record<ApplicationStatus, string> = {
     Drafted: "bg-gray-500",
@@ -77,11 +78,17 @@ export default function DashboardPage() {
             <Card className="w-full max-w-md text-center shadow-lg">
                 <CardHeader>
                     <CardTitle>Welcome to CareerPilot</CardTitle>
+                    <CardDescription>
+                        Your AI-powered job application assistant.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground mb-4">
                         Please sign in to view your dashboard.
                     </p>
+                    <div className="w-full sm:w-auto sm:mx-auto">
+                        <LoginButton />
+                    </div>
                 </CardContent>
             </Card>
         </div>

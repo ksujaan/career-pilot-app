@@ -1,8 +1,8 @@
 'use server';
 /**
- * @fileOverview Extracts job description from a given URL.
+ * @fileOverview Extracts job details from a given URL.
  *
- * - extractJobDescription - A function that takes a job URL and returns the job description.
+ * - extractJobDescription - A function that takes a job URL and returns the job title, company name, and description.
  * - ExtractJobDescriptionInput - The input type for the extractJobDescription function.
  * - ExtractJobDescriptionOutput - The return type for the extractJobDescription function.
  */
@@ -16,6 +16,8 @@ const ExtractJobDescriptionInputSchema = z.object({
 export type ExtractJobDescriptionInput = z.infer<typeof ExtractJobDescriptionInputSchema>;
 
 const ExtractJobDescriptionOutputSchema = z.object({
+  jobTitle: z.string().describe('The extracted job title from the URL.'),
+  companyName: z.string().describe('The extracted company name from the URL.'),
   jobDescription: z.string().describe('The extracted job description from the URL.'),
 });
 export type ExtractJobDescriptionOutput = z.infer<typeof ExtractJobDescriptionOutputSchema>;
@@ -55,13 +57,16 @@ const extractJobDescriptionPrompt = ai.definePrompt({
   name: 'extractJobDescriptionPrompt',
   input: {schema: ExtractJobDescriptionInputSchema},
   tools: [fetchWebsiteContent],
-  prompt: `You are an expert web scraper and data extractor. Your task is to extract the job description from the provided URL. Use the fetchWebsiteContent tool to get the website's content.
+  prompt: `You are an expert web scraper and data extractor. Your task is to extract the job title, company name, and the main job description from the provided URL. Use the fetchWebsiteContent tool to get the website's content.
 
   Job URL: {{{jobUrl}}}
   
-  Analyze the content and identify the main job description. Exclude headers, footers, navigation bars, and any other irrelevant information. Return only the core job description text, including responsibilities, qualifications, and other relevant details.
+  Analyze the content and identify the following information:
+  1. The job title.
+  2. The company name.
+  3. The core job description, including responsibilities, qualifications, and other relevant details. Exclude headers, footers, navigation bars, and any other irrelevant information.
   
-  Please provide the output in a JSON object with a single key "jobDescription".`,
+  Please provide the output in a JSON object with the keys "jobTitle", "companyName", and "jobDescription". If any field cannot be found, return an empty string for that field.`,
 });
 
 
@@ -84,7 +89,7 @@ const extractJobDescriptionFlow = ai.defineFlow(
         console.error("Error parsing job description JSON:", e);
         // Ignore parsing errors and fall through to the default
     }
-    return { jobDescription: "" };
+    return { jobTitle: "", companyName: "", jobDescription: "" };
   }
 );
 

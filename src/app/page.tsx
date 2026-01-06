@@ -66,7 +66,7 @@ export default function NewApplicationPage() {
         toast({
             variant: "destructive",
             title: "No URL provided",
-            description: "Please enter a URL to extract the job description from.",
+            description: "Please enter a URL to extract the job details from.",
         });
         return;
     }
@@ -74,17 +74,19 @@ export default function NewApplicationPage() {
     setIsExtracting(true);
     try {
         const result = await extractJobDescription({ jobUrl });
-        if (result.jobDescription) {
+        if (result.jobDescription || result.jobTitle || result.companyName) {
             form.setValue("jobDescription", result.jobDescription);
+            form.setValue("jobTitle", result.jobTitle);
+            form.setValue("companyName", result.companyName);
             toast({
                 title: "Extraction Successful",
-                description: "The job description has been extracted from the URL.",
+                description: "The job details have been extracted from the URL.",
             });
         } else {
              toast({
                 variant: "destructive",
                 title: "Extraction Failed",
-                description: "Could not extract the job description. Please paste it manually.",
+                description: "Could not extract the job details. Please paste them manually.",
             });
         }
     } catch (error) {
@@ -92,7 +94,7 @@ export default function NewApplicationPage() {
         toast({
             variant: "destructive",
             title: "Extraction Failed",
-            description: "An error occurred while extracting the job description. Please try again.",
+            description: "An error occurred while extracting the job details. Please try again.",
         });
     } finally {
         setIsExtracting(false);

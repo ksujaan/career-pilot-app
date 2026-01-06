@@ -71,13 +71,27 @@ const extractJobDescriptionPrompt = ai.definePrompt({
     Use the 'extractWebsiteData' tool to fetch the content from the job URL: {{{jobUrl}}}
     
     From the extracted text, identify and return the following three fields:
-    1.  **jobTitle**: The title of the position (e.g., "Software Engineer").
+    1.  **jobTitle**: The title of the position (e.g., "Software Engineer"). If you see a job title and location, only extract the job title.
     2.  **companyName**: The name of the company hiring (e.g., "Google").
-    3.  **jobDescription**: The full text of the job description, including responsibilities, qualifications, etc.
+    3.  **jobDescription**: The full text of the job description, including responsibilities, qualifications, etc. Look for "About the job" or similar headings.
     
     If you cannot confidently determine one of the fields, return an empty string for it.
     `,
 });
+
+async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 6000): Promise<T> {
+    try {
+      return await fn();
+    } catch (e: any) {
+      const isQuotaError = (e.cause as any)?.status === 429;
+      if (isQuotaError && retries > 0) {
+        console.log(`Rate limited. Retrying in ${delay / 1000}s...`);
+        await new Promise(res => setTimeout(res, delay));
+        return fetchWithRetry(fn, retries - 1, delay * 2);
+      }
+      throw e;
+    }
+}
 
 const extractJobDescriptionFlow = ai.defineFlow(
   {
@@ -86,8 +100,15 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
-    const { output } = await extractJobDescriptionPrompt(input);
-    return output || { jobTitle: "", companyName: "", jobDescription: "" };
+    const model = 'googleai/gemini-2.0-flash-001';
+    try {
+        const { output } = await fetchWithRetry(() => extractJobDescriptionPrompt(input, { model }));
+        return output || { jobTitle: "", companyName: "", jobDescription: "" };
+    } catch (e) {
+        console.error(`An unexpected error occurred during job description extraction with model ${model}:`, e);
+        // Return a default object or re-throw to be handled by the caller
+        return { jobTitle: "", companyName: "", jobDescription: "" };
+    }
   }
 );
 

@@ -192,7 +192,7 @@ export default function NewApplicationPage() {
                             <FormControl>
                             <Input placeholder="https://www.linkedin.com/jobs/view/..." {...field} />
                             </FormControl>
-                            <Button type="button" onClick={handleExtractDescription} disabled={isExtracting} variant="outline">
+                            <Button type="button" onClick={handleExtractDescription} disabled={isExtracting || !form.watch('jobUrl')} variant="outline">
                                 {isExtracting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                 Extract
                             </Button>
@@ -218,7 +218,7 @@ export default function NewApplicationPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isLoading} size="lg" className="w-full md:w-auto">
+                <Button type="submit" disabled={isLoading || !resume} size="lg" className="w-full md:w-auto">
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                   Generate Application Drafts
                 </Button>

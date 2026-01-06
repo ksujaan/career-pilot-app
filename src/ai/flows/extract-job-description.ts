@@ -54,14 +54,17 @@ const fetchWebsiteContent = ai.defineTool(
 const extractJobDescriptionPrompt = ai.definePrompt({
   name: 'extractJobDescriptionPrompt',
   input: {schema: ExtractJobDescriptionInputSchema},
-  output: {schema: ExtractJobDescriptionOutputSchema},
   tools: [fetchWebsiteContent],
+  output: { format: 'json' },
   prompt: `You are an expert web scraper and data extractor. Your task is to extract the job description from the provided URL. Use the fetchWebsiteContent tool to get the website's content.
 
   Job URL: {{{jobUrl}}}
   
-  Analyze the content and identify the main job description. Exclude headers, footers, navigation bars, and any other irrelevant information. Return only the core job description text, including responsibilities, qualifications, and other relevant details.`,
+  Analyze the content and identify the main job description. Exclude headers, footers, navigation bars, and any other irrelevant information. Return only the core job description text, including responsibilities, qualifications, and other relevant details.
+  
+  Please provide the output in a JSON object with a single key "jobDescription".`,
 });
+
 
 const extractJobDescriptionFlow = ai.defineFlow(
   {
@@ -70,8 +73,16 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
-    const {output} = await extractJobDescriptionPrompt(input);
-    return output || { jobDescription: "" };
+    const result = await extractJobDescriptionPrompt(input);
+    try {
+        const output = result.output();
+        if (output) {
+            return ExtractJobDescriptionOutputSchema.parse(output);
+        }
+    } catch (e) {
+        // Ignore parsing errors and fall through to the default
+    }
+    return { jobDescription: "" };
   }
 );
 

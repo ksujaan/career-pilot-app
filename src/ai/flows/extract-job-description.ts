@@ -31,11 +31,15 @@ const fetchWebsiteContent = ai.defineTool(
     },
     async ({url}) => {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' } });
+        if (!response.ok) {
+            console.error(`Error fetching URL: Status ${response.status}`);
+            return "Could not fetch content.";
+        }
         const text = await response.text();
         const bodyMatch = text.match(/<body[^>]*>([\s\S]*)<\/body>/);
         let bodyContent = bodyMatch ? bodyMatch[1] : '';
-        // A more robust tag stripping process
+        
         bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
         bodyContent = bodyContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
         bodyContent = bodyContent.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
@@ -43,9 +47,10 @@ const fetchWebsiteContent = ai.defineTool(
         bodyContent = bodyContent.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
         bodyContent = bodyContent.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
         bodyContent = bodyContent.replace(/<[^>]+>/g, '\n');
+        bodyContent = bodyContent.replace(/[ \t]+/g, ' ');
         bodyContent = bodyContent.replace(/(\n\s*){3,}/g, '\n\n');
 
-        return bodyContent.substring(0, 10000); // Limit context size
+        return bodyContent.substring(0, 30000); // Increased limit
       } catch (e) {
           console.error(`Error fetching URL: ${e}`);
           return "Could not fetch content.";
@@ -53,21 +58,57 @@ const fetchWebsiteContent = ai.defineTool(
     }
 );
 
-const extractJobDescriptionPrompt = ai.definePrompt({
-  name: 'extractJobDescriptionPrompt',
-  input: {schema: ExtractJobDescriptionInputSchema},
-  tools: [fetchWebsiteContent],
-  prompt: `You are an expert web scraper and data extractor. Your task is to extract the job title, company name, and the main job description from the provided URL. Use the fetchWebsiteContent tool to get the website's content.
+function extractDetails(content: string): ExtractJobDescriptionOutput {
+    let jobTitle = "";
+    let companyName = "";
+    let jobDescription = "";
 
-  Job URL: {{{jobUrl}}}
-  
-  Analyze the content and identify the following information:
-  1. The job title.
-  2. The company name.
-  3. The core job description, including responsibilities, qualifications, and other relevant details. Exclude headers, footers, navigation bars, and any other irrelevant information.
-  
-  Please provide the output in a JSON object with the keys "jobTitle", "companyName", and "jobDescription". If any field cannot be found, return an empty string for that field.`,
-});
+    const titleRegex = [
+        /<h1[^>]*>([^<]+)<\/h1>/i,
+        /job title[:\s]+([^\n]+)/i,
+    ];
+    for (const regex of titleRegex) {
+        const match = content.match(regex);
+        if (match && match[1]) {
+            jobTitle = match[1].trim();
+            break;
+        }
+    }
+
+    const companyRegex = [
+        /company[:\s]+([^\n]+)/i,
+        /at\s+([A-Z][a-zA-Z\s&]+)/, // "at Google"
+    ];
+     for (const regex of companyRegex) {
+        const match = content.match(regex);
+        if (match && match[1]) {
+            companyName = match[1].trim();
+            break;
+        }
+    }
+
+    const descriptionRegex = [
+        /About the job\n([\s\S]+)/i,
+        /Job Description\n([\s\S]+)/i,
+        /Responsibilities\n([\s\S]+)/i,
+    ];
+
+    for (const regex of descriptionRegex) {
+        const match = content.match(regex);
+        if (match && match[1]) {
+            // Take the first big chunk of text after the header
+            jobDescription = match[1].split(/\n\s*\n/)[0].trim();
+            break;
+        }
+    }
+    
+    // Fallback if no specific section is found
+    if (!jobDescription) {
+        jobDescription = content;
+    }
+
+    return { jobTitle, companyName, jobDescription };
+}
 
 
 const extractJobDescriptionFlow = ai.defineFlow(
@@ -77,19 +118,11 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
-    const result = await extractJobDescriptionPrompt(input);
-    try {
-        const output = result.output();
-        if (output) {
-            // The output from the prompt is a string that we expect to be JSON
-            const parsed = JSON.parse(output as string);
-            return ExtractJobDescriptionOutputSchema.parse(parsed);
-        }
-    } catch (e) {
-        console.error("Error parsing job description JSON:", e);
-        // Ignore parsing errors and fall through to the default
+    const content = await fetchWebsiteContent({ url: input.jobUrl });
+    if (content === "Could not fetch content.") {
+        return { jobTitle: "", companyName: "", jobDescription: "" };
     }
-    return { jobTitle: "", companyName: "", jobDescription: "" };
+    return extractDetails(content);
   }
 );
 

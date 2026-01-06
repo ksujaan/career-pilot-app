@@ -89,7 +89,7 @@ const extractJobDescriptionFlow = ai.defineFlow(
         const { output } = await extractJobDescriptionPrompt(input, {model: primaryModel});
         return output || { jobTitle: "", companyName: "", jobDescription: "" };
     } catch (e: any) {
-        const isQuotaError = e.status === 429 || (e.cause as any)?.status === 429;
+        const isQuotaError = (e.cause as any)?.status === 429;
 
         if (isQuotaError) {
             console.warn(`Quota exceeded for ${primaryModel}. Trying backup model ${backupModel}.`);

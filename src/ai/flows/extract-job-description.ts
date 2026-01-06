@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview Extracts job details from a given URL.
+ * @fileOverview Extracts job details from a given URL using a hybrid approach.
  *
  * - extractJobDescription - A function that takes a job URL and returns the job title, company name, and description.
  * - ExtractJobDescriptionInput - The input type for the extractJobDescription function.
@@ -22,79 +22,62 @@ const ExtractJobDescriptionOutputSchema = z.object({
 });
 export type ExtractJobDescriptionOutput = z.infer<typeof ExtractJobDescriptionOutputSchema>;
 
+// This tool's only job is to fetch the raw text from a URL.
+// The complex parsing is left to the LLM.
 const extractWebsiteData = ai.defineTool(
     {
       name: 'extractWebsiteData',
-      description: 'Fetches and extracts structured job data from a given URL.',
-      input: {schema: z.object({url: z.string().url()})},
-      output: {schema: ExtractJobDescriptionOutputSchema},
+      description: 'Fetches the text content from a given URL.',
+      inputSchema: z.object({url: z.string().url()}),
+      outputSchema: z.string(),
     },
     async ({url}) => {
         try {
             const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' } });
             if (!response.ok) {
                 console.error(`Error fetching URL: Status ${response.status}`);
-                return { jobTitle: "", companyName: "", jobDescription: "" };
+                return `Failed to fetch content from URL. Status: ${response.status}`;
             }
             const text = await response.text();
-
-            // Simple HTML to text conversion for cleanup
-            const cleanText = (html: string) => {
-                let content = html;
-                content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-                content = content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-                content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
-                content = content.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
-                content = content.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
-                content = content.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
-                content = content.replace(/<[^>]+>/g, '\n');
-                content = content.replace(/[ \t]+/g, ' ');
-                content = content.replace(/(\n\s*){3,}/g, '\n\n');
-                return content;
-            };
             
-            const bodyText = cleanText(text);
-
-            // Simple Regex to find job description section
-            const jobDescriptionRegex = /(About the job|Job description|Job details)[\s\S]*/i;
-            const descriptionMatch = bodyText.match(jobDescriptionRegex);
-            const jobDescription = descriptionMatch ? descriptionMatch[0].trim().substring(0, 5000) : ""; // Limit length
-
-            // For title and company, we can try to get it from the <title> tag as a fallback
-            const titleRegex = /<title>(.*?)<\/title>/i;
-            const titleMatch = text.match(titleRegex);
-            let pageTitle = titleMatch ? titleMatch[1] : "";
-
-            let jobTitle = "";
-            let companyName = "";
-
-            if (pageTitle.includes(" | ")) {
-                const parts = pageTitle.split(" | ");
-                jobTitle = parts[0];
-                companyName = parts[1];
-            } else if (pageTitle.includes(" at ")) {
-                const parts = pageTitle.split(" at ");
-                jobTitle = parts[0];
-                companyName = parts[1];
-            } else if (pageTitle.includes(" - ")) {
-                 const parts = pageTitle.split(" - ");
-                jobTitle = parts[0];
-                companyName = parts[1];
-            }
-
-            return {
-                jobTitle: jobTitle.trim(),
-                companyName: companyName.trim(),
-                jobDescription: jobDescription,
-            };
-
-        } catch (e) {
+            // Basic HTML to text conversion to clean up the content for the LLM
+            let content = text;
+            content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+            content = content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+            content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
+            content = content.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
+            content = content.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
+            content = content.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+            content = content.replace(/<[^>]+>/g, '\n');
+            content = content.replace(/[ \t]+/g, ' ');
+            content = content.replace(/(\n\s*){3,}/g, '\n\n');
+            
+            // Limit content to prevent overly large payloads to the LLM
+            return content.trim().substring(0, 15000);
+        } catch (e: any) {
             console.error(`Error processing URL: ${e}`);
-            return { jobTitle: "", companyName: "", jobDescription: "" };
+            return `An error occurred while fetching the URL: ${e.message}`;
         }
     }
 );
 
+const extractJobDescriptionPrompt = ai.definePrompt({
+    name: 'extractJobDescriptionPrompt',
+    input: { schema: ExtractJobDescriptionInputSchema },
+    output: { schema: ExtractJobDescriptionOutputSchema },
+    tools: [extractWebsiteData],
+    prompt: `You are an expert data extraction agent. Your task is to extract the job title, company name, and full job description from the content of the provided URL.
+
+    Use the 'extractWebsiteData' tool to fetch the content from the job URL: {{{jobUrl}}}
+    
+    From the extracted text, identify and return the following three fields:
+    1.  **jobTitle**: The title of the position (e.g., "Software Engineer").
+    2.  **companyName**: The name of the company hiring (e.g., "Google").
+    3.  **jobDescription**: The full text of the job description, including responsibilities, qualifications, etc.
+    
+    If you cannot confidently determine one of the fields, return an empty string for it.
+    `,
+});
 
 const extractJobDescriptionFlow = ai.defineFlow(
   {
@@ -102,10 +85,9 @@ const extractJobDescriptionFlow = ai.defineFlow(
     inputSchema: ExtractJobDescriptionInputSchema,
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
-  async ({ jobUrl }) => {
-    // Directly call the tool and return its result. No LLM needed.
-    const result = await extractWebsiteData({ url: jobUrl });
-    return result;
+  async (input) => {
+    const { output } = await extractJobDescriptionPrompt(input);
+    return output || { jobTitle: "", companyName: "", jobDescription: "" };
   }
 );
 

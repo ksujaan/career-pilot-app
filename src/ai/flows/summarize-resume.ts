@@ -40,7 +40,7 @@ const summarizeResumeFlow = ai.defineFlow(
       outputSchema: SummarizeResumeOutputSchema,
     },
     async (input) => {
-        const { output } = await summarizeResumePrompt(input, {model: 'groq/llama3-8b-8192'});
+        const { output } = await summarizeResumePrompt(input, {model: 'llama3-8b-8192'});
         return output!;
     }
 );

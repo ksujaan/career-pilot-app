@@ -66,7 +66,7 @@ const generateCustomApplicationDraftsFlow = ai.defineFlow(
     outputSchema: GenerateCustomApplicationDraftsOutputSchema,
   },
   async input => {
-    const {output} = await generateCustomApplicationDraftsPrompt(input, {model: 'groq/llama3-8b-8192'});
+    const {output} = await generateCustomApplicationDraftsPrompt(input, {model: 'llama3-8b-8192'});
     return output!;
   }
 );

@@ -22,58 +22,79 @@ const ExtractJobDescriptionOutputSchema = z.object({
 });
 export type ExtractJobDescriptionOutput = z.infer<typeof ExtractJobDescriptionOutputSchema>;
 
-const fetchWebsiteContent = ai.defineTool(
+const extractWebsiteData = ai.defineTool(
     {
-      name: 'fetchWebsiteContent',
-      description: 'Fetches the text content of a given URL.',
+      name: 'extractWebsiteData',
+      description: 'Fetches and extracts structured job data from a given URL.',
       input: {schema: z.object({url: z.string().url()})},
-      output: {schema: z.string()},
+      output: {schema: ExtractJobDescriptionOutputSchema},
     },
     async ({url}) => {
-      try {
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' } });
-        if (!response.ok) {
-            console.error(`Error fetching URL: Status ${response.status}`);
-            return "Could not fetch content.";
-        }
-        const text = await response.text();
-        // Simple HTML to text conversion
-        let bodyContent = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-        bodyContent = bodyContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-        bodyContent = bodyContent.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
-        bodyContent = bodyContent.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
-        bodyContent = bodyContent.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
-        bodyContent = bodyContent.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
-        bodyContent = bodyContent.replace(/<[^>]+>/g, '\n');
-        bodyContent = bodyContent.replace(/[ \t]+/g, ' ');
-        bodyContent = bodyContent.replace(/(\n\s*){3,}/g, '\n\n');
+        try {
+            const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' } });
+            if (!response.ok) {
+                console.error(`Error fetching URL: Status ${response.status}`);
+                return { jobTitle: "", companyName: "", jobDescription: "" };
+            }
+            const text = await response.text();
 
-        // Limit the content to avoid being too large for the model
-        return bodyContent.substring(0, 30000); 
-      } catch (e) {
-          console.error(`Error fetching URL: ${e}`);
-          return "Could not fetch content.";
-      }
+            // Simple HTML to text conversion for cleanup
+            const cleanText = (html: string) => {
+                let content = html;
+                content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+                content = content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+                content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
+                content = content.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
+                content = content.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
+                content = content.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+                content = content.replace(/<[^>]+>/g, '\n');
+                content = content.replace(/[ \t]+/g, ' ');
+                content = content.replace(/(\n\s*){3,}/g, '\n\n');
+                return content;
+            };
+            
+            const bodyText = cleanText(text);
+
+            // Simple Regex to find job description section
+            const jobDescriptionRegex = /(About the job|Job description|Job details)[\s\S]*/i;
+            const descriptionMatch = bodyText.match(jobDescriptionRegex);
+            const jobDescription = descriptionMatch ? descriptionMatch[0].trim().substring(0, 5000) : ""; // Limit length
+
+            // For title and company, we can try to get it from the <title> tag as a fallback
+            const titleRegex = /<title>(.*?)<\/title>/i;
+            const titleMatch = text.match(titleRegex);
+            let pageTitle = titleMatch ? titleMatch[1] : "";
+
+            let jobTitle = "";
+            let companyName = "";
+
+            if (pageTitle.includes(" | ")) {
+                const parts = pageTitle.split(" | ");
+                jobTitle = parts[0];
+                companyName = parts[1];
+            } else if (pageTitle.includes(" at ")) {
+                const parts = pageTitle.split(" at ");
+                jobTitle = parts[0];
+                companyName = parts[1];
+            } else if (pageTitle.includes(" - ")) {
+                 const parts = pageTitle.split(" - ");
+                jobTitle = parts[0];
+                companyName = parts[1];
+            }
+
+            return {
+                jobTitle: jobTitle.trim(),
+                companyName: companyName.trim(),
+                jobDescription: jobDescription,
+            };
+
+        } catch (e) {
+            console.error(`Error processing URL: ${e}`);
+            return { jobTitle: "", companyName: "", jobDescription: "" };
+        }
     }
 );
 
-
-const extractJobDescriptionPrompt = ai.definePrompt({
-    name: 'extractJobDescriptionPrompt',
-    input: { schema: z.object({ jobUrl: z.string() }) },
-    output: { schema: ExtractJobDescriptionOutputSchema },
-    tools: [fetchWebsiteContent],
-    prompt: `You are an expert data extractor. A user has provided a URL to a job posting.
-    Fetch the content of the webpage using the fetchWebsiteContent tool.
-    From the content, extract the following information:
-    1.  Job Title
-    2.  Company Name
-    3.  Job Description (This is usually under a heading like "About the job", "Job details", or "Description").
-
-    Return the extracted data as a JSON object. If you cannot find a piece of information, return an empty string for that field.
-    
-    URL: {{{jobUrl}}}`,
-});
 
 const extractJobDescriptionFlow = ai.defineFlow(
   {
@@ -81,17 +102,10 @@ const extractJobDescriptionFlow = ai.defineFlow(
     inputSchema: ExtractJobDescriptionInputSchema,
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
-  async (input) => {
-    // Using a different model directly to avoid quota issues.
-    const model = 'googleai/gemini-2.0-flash';
-    try {
-        const { output } = await extractJobDescriptionPrompt(input, {model});
-        return output || { jobTitle: "", companyName: "", jobDescription: "" };
-    } catch (e) {
-        console.error(`An unexpected error occurred during job description extraction with model ${model}:`, e);
-        // Re-throw the error to be handled by the caller, which will show a toast.
-        throw e;
-    }
+  async ({ jobUrl }) => {
+    // Directly call the tool and return its result. No LLM needed.
+    const result = await extractWebsiteData({ url: jobUrl });
+    return result;
   }
 );
 

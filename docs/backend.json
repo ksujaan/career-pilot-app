@@ -6,19 +6,20 @@
       "type": "object",
       "description": "Stores the user's profile information, including their resume/CV.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the UserProfile entity."
-        },
         "resume": {
           "type": "string",
-          "description": "The user's resume/CV content."
+          "description": "The user's cleaned resume/CV content."
+        },
+        "resumeSummary": {
+          "type": "string",
+          "description": "An AI-generated summary of the resume."
+        },
+        "resumeFileName": {
+          "type": "string",
+          "description": "The name of the originally uploaded resume file."
         }
       },
-      "required": [
-        "id",
-        "resume"
-      ]
+      "required": []
     },
     "JobApplication": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -29,10 +30,6 @@
         "id": {
           "type": "string",
           "description": "Unique identifier for the JobApplication entity."
-        },
-        "userProfileId": {
-          "type": "string",
-          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N JobApplication)"
         },
         "companyName": {
           "type": "string",
@@ -48,8 +45,13 @@
         },
         "status": {
           "type": "string",
-          "description": "The current status of the application (Drafted, Applied, Interviewing, Rejected).",
-          "format": "string"
+          "description": "The current status of the application.",
+          "enum": [
+            "Drafted",
+            "Applied",
+            "Interviewing",
+            "Rejected"
+          ]
         },
         "coverLetter": {
           "type": "string",
@@ -58,67 +60,42 @@
         "coldEmail": {
           "type": "string",
           "description": "The generated cold email for the application."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the application was created."
         }
       },
       "required": [
         "id",
-        "userProfileId",
         "companyName",
         "jobTitle",
         "jobDescription",
-        "status"
+        "status",
+        "coverLetter",
+        "coldEmail",
+        "createdAt"
       ]
     }
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "google.com"
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}/userProfiles/{userProfileId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Stores user profile information, including resume/CV.  Accessible only to the user with matching {userId}.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "userProfileId",
-              "description": "The unique identifier of the user profile."
-            }
-          ]
-        }
+    "/users/{userId}/profile/main": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
       },
-      {
-        "path": "/users/{userId}/jobApplications/{jobApplicationId}",
-        "definition": {
-          "entityName": "JobApplication",
-          "schema": {
-            "$ref": "#/backend/entities/JobApplication"
-          },
-          "description": "Stores information about a specific job application. Accessible only to the user with matching {userId}.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            },
-            {
-              "name": "jobApplicationId",
-              "description": "The unique identifier of the job application."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed to be secure, scalable, and easily debuggable, following the core design principles and strategy mandates. It primarily utilizes path-based ownership for user data.  Each user has their own UserProfile and JobApplications stored under their unique user ID. This approach ensures clear ownership, avoids complex authorization logic, and facilitates secure `list` operations.  Authorization Independence is achieved by structuring the data around user-specific paths (`/users/{userId}/userProfiles/{userProfileId}` and `/users/{userId}/jobApplications/{jobApplicationId}`). Since each user's data is isolated under their user ID, rules can be written to allow access only to the authenticated user (`request.auth.uid == userId`). This eliminates the need for `get()` calls in rules, simplifying security logic and enabling atomic operations. QAPs (Rules are not Filters) are supported because listing operations are always scoped to a specific user's data.  The structure avoids mixing data with different access needs in the same collection, ensuring a homogeneous security posture."
+      "description": "Stores the user's single profile document."
+    },
+    "/users/{userId}/applications/{applicationId}": {
+      "schema": {
+        "$ref": "#/entities/JobApplication"
+      },
+      "description": "Stores job applications for a specific user."
+    }
   }
 }

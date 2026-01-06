@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useLocalStorage } from "@/hooks/use-local-storage";
 import { Application, ApplicationStatus, APPLICATION_STATUSES } from "@/lib/types";
 import {
   Table,
@@ -30,9 +29,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Eye, CalendarIcon, Briefcase, Building } from "lucide-react";
+import { Eye, CalendarIcon, Briefcase, Building, Loader2 } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
-import { cn } from "@/lib/utils";
+import { useFirebase, useUser, useMemoFirebase, useCollection } from "@/firebase";
+import { collection, doc, updateDoc } from "firebase/firestore";
 
 const statusColors: Record<ApplicationStatus, string> = {
     Drafted: "bg-gray-500",
@@ -42,18 +42,53 @@ const statusColors: Record<ApplicationStatus, string> = {
 };
 
 export default function DashboardPage() {
-  const [applications, setApplications] = useLocalStorage<Application[]>("applications", []);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const { user, isUserLoading } = useUser();
+  const { firestore } = useFirebase();
 
-  const handleStatusChange = (applicationId: string, newStatus: ApplicationStatus) => {
-    setApplications(
-      applications.map((app) =>
-        app.id === applicationId ? { ...app, status: newStatus } : app
-      )
-    );
+  const applicationsCollectionRef = useMemoFirebase(
+    () => (user ? collection(firestore, `users/${user.uid}/applications`) : null),
+    [user, firestore]
+  );
+
+  const { data: applications, isLoading: isLoadingApplications } = useCollection<Application>(applicationsCollectionRef);
+
+  const handleStatusChange = async (applicationId: string, newStatus: ApplicationStatus) => {
+    if (!user) return;
+    const appDocRef = doc(firestore, `users/${user.uid}/applications`, applicationId);
+    try {
+        await updateDoc(appDocRef, { status: newStatus });
+    } catch (error) {
+        console.error("Error updating status: ", error);
+    }
   };
+
+  if (isUserLoading || isLoadingApplications) {
+    return (
+        <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
   
-  if (applications.length === 0) {
+  if (!user) {
+    return (
+         <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+            <Card className="w-full max-w-md text-center shadow-lg">
+                <CardHeader>
+                    <CardTitle>Welcome to CareerPilot</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground mb-4">
+                        Please sign in to view your dashboard.
+                    </p>
+                </CardContent>
+            </Card>
+        </div>
+    )
+  }
+
+  if (!applications || applications.length === 0) {
     return (
         <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
             <Card className="w-full max-w-md text-center shadow-lg">
@@ -82,7 +117,6 @@ export default function DashboardPage() {
             </p>
         </div>
         
-        {/* Table for larger screens */}
       <Card className="hidden md:block">
         <CardContent className="p-0">
           <Table>
@@ -138,7 +172,6 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
       
-      {/* Cards for smaller screens */}
         <div className="grid gap-4 md:hidden">
             {applications.map((app) => (
                 <Card key={app.id}>

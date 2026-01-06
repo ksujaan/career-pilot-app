@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useLocalStorage } from "@/hooks/use-local-storage";
 import {
   Card,
   CardContent,
@@ -18,6 +17,8 @@ import * as pdfjs from 'pdfjs-dist';
 import { Textarea } from "@/components/ui/textarea";
 import { summarizeResume } from "@/ai/flows/summarize-resume";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFirebase, useUser, useMemoFirebase, useDoc } from "@/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -25,14 +26,24 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 export default function ProfilePage() {
-  const [resume, setResume] = useLocalStorage<string>("resume", "");
-  const [resumeSummary, setResumeSummary] = useLocalStorage<string>("resume-summary", "");
-  const [fileName, setFileName] = useLocalStorage<string | null>("resume-filename", null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const { toast } = useToast();
+  const { firestore } = useFirebase();
+  const { user, isUserLoading } = useUser();
+
+  const profileRef = useMemoFirebase(() => 
+    user ? doc(firestore, `users/${user.uid}/profile/main`) : null, 
+    [user, firestore]
+  );
+  
+  const { data: profile, isLoading: isProfileLoading } = useDoc(profileRef);
+
+  const isLoading = isParsing || isSummarizing || isUserLoading || isProfileLoading;
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!profileRef) return;
+    
     const file = event.target.files?.[0];
     if (file) {
       if (file.type !== "application/pdf") {
@@ -43,9 +54,10 @@ export default function ProfilePage() {
         });
         return;
       }
-      setIsLoading(true);
-      setFileName(file.name);
+      setIsParsing(true);
+      
       try {
+        await setDoc(profileRef, { resumeFileName: file.name }, { merge: true });
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjs.getDocument(arrayBuffer).promise;
         let textContent = "";
@@ -54,46 +66,77 @@ export default function ProfilePage() {
           const text = await page.getTextContent();
           textContent += text.items.map(item => ('str' in item ? item.str : '')).join(" ") + "\n";
         }
+        setIsParsing(false);
         
-        // Start summarization
         setIsSummarizing(true);
         const { cleanedText, summary } = await summarizeResume({ resumeText: textContent });
-        setResume(cleanedText);
-        setResumeSummary(summary);
+        
+        await setDoc(profileRef, {
+          resume: cleanedText,
+          resumeSummary: summary,
+        }, { merge: true });
 
         toast({
           title: "Resume Processed",
-          description: "Your resume has been parsed and summarized.",
+          description: "Your resume has been parsed, summarized, and saved.",
         });
       } catch (error) {
         console.error("Failed to process PDF:", error);
         toast({
           variant: "destructive",
           title: "Processing Failed",
-          description: "There was an error reading and summarizing your resume.",
+          description: "There was an error reading and saving your resume.",
         });
-        setFileName(null);
-        setResume("");
-        setResumeSummary("");
+        await setDoc(profileRef, { resume: "", resumeSummary: "", resumeFileName: "" }, { merge: true });
       } finally {
-        setIsLoading(false);
+        setIsParsing(false);
         setIsSummarizing(false);
       }
     }
   };
   
-  const handleRemoveResume = () => {
-    setResume("");
-    setResumeSummary("");
-    setFileName(null);
+  const handleRemoveResume = async () => {
+    if (!profileRef) return;
+
+    await setDoc(profileRef, {
+        resume: "",
+        resumeSummary: "",
+        resumeFileName: ""
+    }, { merge: true });
+
     const input = document.getElementById('resume-upload') as HTMLInputElement;
     if (input) {
       input.value = '';
     }
     toast({
         title: "Resume Removed",
-        description: "Your resume has been cleared.",
+        description: "Your resume has been cleared from your profile.",
     });
+  }
+
+  if (isUserLoading) {
+    return (
+        <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
+
+  if (!user) {
+    return (
+         <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+            <Card className="w-full max-w-md text-center shadow-lg">
+                <CardHeader>
+                    <CardTitle>Welcome to CareerPilot</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground mb-4">
+                        Please sign in to manage your profile.
+                    </p>
+                </CardContent>
+            </Card>
+        </div>
+    )
   }
 
   return (
@@ -109,20 +152,20 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle>Master Resume/CV</CardTitle>
             <CardDescription>
-              Upload your resume as a PDF. It will be saved locally, processed by AI to be cleaned up, and used to generate tailored application materials.
+              Upload your resume as a PDF. It will be saved to your profile, processed by AI, and used to generate tailored application materials.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid w-full gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="resume-upload">Upload PDF</Label>
-                 {fileName ? (
+                 {profile?.resumeFileName && !isLoading ? (
                   <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-3">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <FileText className="h-6 w-6 shrink-0 text-primary" />
-                        <span className="font-medium text-sm truncate">{fileName}</span>
+                        <span className="font-medium text-sm truncate">{profile.resumeFileName}</span>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleRemoveResume} disabled={isLoading || isSummarizing}>
+                    <Button variant="ghost" size="icon" onClick={handleRemoveResume} disabled={isLoading}>
                         <X className="h-4 w-4" />
                         <span className="sr-only">Remove resume</span>
                     </Button>
@@ -135,10 +178,10 @@ export default function ProfilePage() {
                     accept="application/pdf"
                     onChange={handleFileChange}
                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    disabled={isLoading || isSummarizing}
+                    disabled={isLoading}
                   />
                   <div className="flex h-32 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-input bg-background text-center transition-colors hover:border-primary">
-                    {isLoading || isSummarizing ? (
+                    {isParsing || isSummarizing ? (
                         <>
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             <p className="mt-2 text-sm text-muted-foreground">{isSummarizing ? "AI is processing..." : "Reading PDF..."}</p>
@@ -157,35 +200,35 @@ export default function ProfilePage() {
                 )}
               </div>
                <p className="text-sm text-muted-foreground">
-                Your resume is stored only on this device and is not sent to any server until you generate drafts.
+                Your resume is stored securely in your Firebase account.
               </p>
             </div>
             
-            {(isLoading || isSummarizing || resume) && (
+            {(isLoading || profile?.resume) && (
               <div className="space-y-6">
-                {isSummarizing || resumeSummary ? (
+                {isSummarizing || profile?.resumeSummary ? (
                    <div className="space-y-2">
                         <Label className="flex items-center gap-2">
                             <Sparkles className="h-4 w-4 text-primary" />
                             AI-Generated Summary
                         </Label>
-                        {isSummarizing ? (
+                        {isSummarizing || (isProfileLoading && !profile?.resumeSummary) ? (
                              <Card className="p-4 bg-muted/50 space-y-2">
                                 <Skeleton className="h-4 w-3/4" />
                                 <Skeleton className="h-4 w-1/2" />
                             </Card>
-                        ) : resumeSummary && (
+                        ) : profile?.resumeSummary && (
                             <Card className="p-4 bg-muted/50">
-                                <p className="text-sm">{resumeSummary}</p>
+                                <p className="text-sm">{profile.resumeSummary}</p>
                             </Card>
                         )}
                    </div>
                 ) : null}
 
-                {isLoading || resume ? (
+                {isParsing || profile?.resume ? (
                     <div className="space-y-2">
                         <Label>Parsed & Cleaned Resume Content</Label>
-                        {isLoading && !resume ? (
+                        {isParsing && !profile?.resume ? (
                              <Textarea 
                                 readOnly
                                 value="Parsing PDF..."
@@ -194,7 +237,7 @@ export default function ProfilePage() {
                         ) : (
                              <Textarea 
                                 readOnly
-                                value={resume}
+                                value={profile?.resume || ""}
                                 className="min-h-[300px] bg-muted/50 whitespace-pre-wrap"
                                 placeholder="Parsed resume content will appear here..."
                             />

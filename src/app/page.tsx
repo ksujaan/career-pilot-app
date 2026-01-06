@@ -9,8 +9,6 @@ import {
   GenerateCustomApplicationDraftsOutput,
 } from "@/ai/flows/generate-custom-application-drafts";
 import { extractJobDescription } from "@/ai/flows/extract-job-description";
-import { useLocalStorage } from "@/hooks/use-local-storage";
-import type { Application } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -34,6 +32,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { CopyButton } from "@/components/copy-button";
 import { Loader2, Sparkles, Send } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFirebase, useMemoFirebase, useUser } from "@/firebase";
+import { doc, collection, setDoc, serverTimestamp } from "firebase/firestore";
+import { useDoc } from "@/firebase/firestore/use-doc";
 
 const formSchema = z.object({
   companyName: z.string().min(2, "Company name is required"),
@@ -43,12 +44,19 @@ const formSchema = z.object({
 });
 
 export default function NewApplicationPage() {
-  const [applications, setApplications] = useLocalStorage<Application[]>("applications", []);
-  const [resume] = useLocalStorage<string>("resume", "");
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [drafts, setDrafts] = useState<GenerateCustomApplicationDraftsOutput | null>(null);
+
+  const { firestore } = useFirebase();
+  const { user, isUserLoading } = useUser();
+
+  const profileRef = useMemoFirebase(() => 
+    user ? doc(firestore, `users/${user.uid}/profile/main`) : null, 
+    [user, firestore]
+  );
+  const { data: profile } = useDoc(profileRef);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -102,7 +110,15 @@ export default function NewApplicationPage() {
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!resume) {
+    if (!user || !firestore) {
+        toast({
+            variant: "destructive",
+            title: "Not Signed In",
+            description: "You must be signed in to create an application.",
+        });
+        return;
+    }
+    if (!profile?.resume) {
       toast({
         variant: "destructive",
         title: "No Resume Found",
@@ -114,31 +130,60 @@ export default function NewApplicationPage() {
     setIsLoading(true);
     setDrafts(null);
     try {
-      const result = await generateCustomApplicationDrafts({ resume, ...values });
+      const result = await generateCustomApplicationDrafts({ resume: profile.resume, ...values });
       setDrafts(result);
       
-      const newApplication: Application = {
-        id: crypto.randomUUID(),
+      const newApplicationId = doc(collection(firestore, 'a-path')).id;
+      const applicationRef = doc(firestore, `users/${user.uid}/applications/${newApplicationId}`);
+
+      await setDoc(applicationRef, {
+        id: newApplicationId,
         ...values,
         ...result,
         status: "Drafted",
         createdAt: new Date().toISOString(),
-      };
-      setApplications([newApplication, ...applications]);
-      toast({
-        title: "Drafts Generated",
-        description: "Your cover letter and cold email are ready.",
       });
-    } catch (error) {
+
+      toast({
+        title: "Drafts Generated & Saved",
+        description: "Your new application has been saved to your dashboard.",
+      });
+    } catch (error: any) {
       console.error("Failed to generate drafts:", error);
       toast({
         variant: "destructive",
         title: "Generation Failed",
-        description: "There was an error generating your application drafts. Please try again.",
+        description: error.message || "There was an error generating your application drafts. Please try again.",
       });
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (isUserLoading) {
+    return (
+        <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
+  
+  if (!user) {
+    return (
+         <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+            <Card className="w-full max-w-md text-center shadow-lg">
+                <CardHeader>
+                    <CardTitle>Welcome to CareerPilot</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground mb-4">
+                        Please sign in to manage your job applications.
+                    </p>
+                    {/* The login button will be in the header */}
+                </CardContent>
+            </Card>
+        </div>
+    )
   }
 
   return (
@@ -218,10 +263,15 @@ export default function NewApplicationPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isLoading || !resume} size="lg" className="w-full md:w-auto">
+                <Button type="submit" disabled={isLoading || !profile?.resume} size="lg" className="w-full md:w-auto">
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                   Generate Application Drafts
                 </Button>
+                 {!profile?.resume && (
+                    <p className="text-sm text-muted-foreground">
+                        You need to upload a resume on the Profile page before you can generate drafts.
+                    </p>
+                )}
               </form>
             </Form>
           </CardContent>

@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 import AppLayoutClient from './app-layout-client';
+import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 
 export const metadata: Metadata = {
@@ -23,9 +24,11 @@ export default function RootLayout({
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       </head>
       <body className="font-body antialiased">
-        <AppLayoutClient>
-          {children}
-        </AppLayoutClient>
+        <FirebaseClientProvider>
+          <AppLayoutClient>
+            {children}
+          </AppLayoutClient>
+        </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>

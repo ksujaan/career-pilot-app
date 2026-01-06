@@ -19,8 +19,9 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
+import { LoginButton } from "./auth/login-button";
 
 function PaperPlaneIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -97,6 +98,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarContent>
+         <SidebarFooter>
+            <LoginButton />
+        </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
@@ -104,10 +108,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <PanelLeft className="h-5 w-5" />
                 <span className="sr-only">Toggle Menu</span>
             </SidebarTrigger>
-            <div className="flex items-center gap-2 font-semibold">
-                <PaperPlaneIcon className="h-5 w-5 text-primary" />
-                <span>CareerPilot</span>
+            <div className="flex-1">
+                 <div className="flex items-center gap-2 font-semibold">
+                    <PaperPlaneIcon className="h-5 w-5 text-primary" />
+                    <span>CareerPilot</span>
+                </div>
             </div>
+            <LoginButton />
         </header>
         <main className="flex-1 overflow-auto">{children}</main>
       </SidebarInset>

@@ -26,12 +26,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { format } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Eye } from "lucide-react";
+import { Eye, CalendarIcon, Briefcase, Building } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
+import { cn } from "@/lib/utils";
 
 const statusColors: Record<ApplicationStatus, string> = {
     Drafted: "bg-gray-500",
@@ -73,14 +74,16 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="container mx-auto py-8 px-4 md:px-6">
         <div className="space-y-2 mb-8">
             <h1 className="text-3xl font-bold tracking-tight">Application Tracker</h1>
             <p className="text-muted-foreground">
                 Manage and track all your job applications in one place.
             </p>
         </div>
-      <Card>
+        
+        {/* Table for larger screens */}
+      <Card className="hidden md:block">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -134,29 +137,80 @@ export default function DashboardPage() {
           </Table>
         </CardContent>
       </Card>
+      
+      {/* Cards for smaller screens */}
+        <div className="grid gap-4 md:hidden">
+            {applications.map((app) => (
+                <Card key={app.id}>
+                    <CardHeader>
+                        <CardTitle className="text-lg">{app.jobTitle}</CardTitle>
+                        <CardDescription>
+                            <div className="flex items-center gap-2 text-muted-foreground pt-1">
+                                <Building className="h-4 w-4" />
+                                <span>{app.companyName}</span>
+                            </div>
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                         <div className="flex items-center gap-2 text-sm">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            <span>{format(new Date(app.createdAt), 'MMM dd, yyyy')}</span>
+                        </div>
+                        <Select
+                            value={app.status}
+                            onValueChange={(value) => handleStatusChange(app.id, value as ApplicationStatus)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Set status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {APPLICATION_STATUSES.map((status) => (
+                                    <SelectItem key={status} value={status}>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`h-2 w-2 rounded-full ${statusColors[status]}`} />
+                                            {status}
+                                        </div>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </CardContent>
+                    <CardFooter>
+                         <Dialog onOpenChange={(isOpen) => !isOpen && setSelectedApplication(null)}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" className="w-full" onClick={() => setSelectedApplication(app)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Drafts
+                                </Button>
+                            </DialogTrigger>
+                        </Dialog>
+                    </CardFooter>
+                </Card>
+            ))}
+        </div>
 
         {selectedApplication && (
              <Dialog open={!!selectedApplication} onOpenChange={(isOpen) => !isOpen && setSelectedApplication(null)}>
-                <DialogContent className="max-w-4xl h-[90vh]">
+                <DialogContent className="max-w-4xl h-full md:h-[90vh] flex flex-col">
                     <DialogHeader>
-                        <DialogTitle>Application Drafts for {selectedApplication.jobTitle} at {selectedApplication.companyName}</DialogTitle>
+                        <DialogTitle>Application for {selectedApplication.jobTitle} at {selectedApplication.companyName}</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                        <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 flex-1 min-h-0">
+                        <div className="flex flex-col gap-2 min-h-0">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-semibold">Cover Letter</h3>
                                 <CopyButton textToCopy={selectedApplication.coverLetter} />
                             </div>
-                            <ScrollArea className="border rounded-md p-4 h-full max-h-[calc(80vh-100px)]">
+                            <ScrollArea className="border rounded-md p-4 flex-1">
                                 <p className="text-sm whitespace-pre-wrap">{selectedApplication.coverLetter}</p>
                             </ScrollArea>
                         </div>
-                         <div className="flex flex-col gap-2">
+                         <div className="flex flex-col gap-2 min-h-0">
                              <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-semibold">Cold Email</h3>
                                 <CopyButton textToCopy={selectedApplication.coldEmail} />
                             </div>
-                            <ScrollArea className="border rounded-md p-4 h-full max-h-[calc(80vh-100px)]">
+                            <ScrollArea className="border rounded-md p-4 flex-1">
                                 <p className="text-sm whitespace-pre-wrap">{selectedApplication.coldEmail}</p>
                             </ScrollArea>
                         </div>

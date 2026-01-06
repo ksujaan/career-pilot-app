@@ -97,7 +97,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto max-w-4xl py-8 px-4">
+    <div className="container mx-auto max-w-5xl py-8 px-4 md:px-6">
       <div className="space-y-8">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Your Profile</h1>
@@ -118,9 +118,9 @@ export default function ProfilePage() {
                 <Label htmlFor="resume-upload">Upload PDF</Label>
                  {fileName ? (
                   <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-3">
-                    <div className="flex items-center gap-3">
-                        <FileText className="h-6 w-6 text-primary" />
-                        <span className="font-medium text-sm">{fileName}</span>
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        <FileText className="h-6 w-6 shrink-0 text-primary" />
+                        <span className="font-medium text-sm truncate">{fileName}</span>
                     </div>
                     <Button variant="ghost" size="icon" onClick={handleRemoveResume} disabled={isLoading || isSummarizing}>
                         <X className="h-4 w-4" />

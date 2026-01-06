@@ -142,7 +142,7 @@ export default function NewApplicationPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-4xl py-8 px-4">
+    <div className="container mx-auto max-w-5xl py-8 px-4 md:px-6">
       <div className="space-y-8">
         <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">New Application</h1>
@@ -194,7 +194,7 @@ export default function NewApplicationPage() {
                             </FormControl>
                             <Button type="button" onClick={handleExtractDescription} disabled={isExtracting || !form.watch('jobUrl')} variant="outline">
                                 {isExtracting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                Extract
+                                <span className="hidden sm:inline">Extract</span>
                             </Button>
                         </div>
                         <FormMessage />

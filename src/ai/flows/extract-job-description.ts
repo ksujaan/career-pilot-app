@@ -83,36 +83,47 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
+    const primaryModel = 'googleai/gemini-2.5-flash';
+    const backupModel = 'googleai/gemini-2.0-flash';
+    
+    // @ts-ignore
+    const promptMessages = extractJobDescriptionPrompt.messages;
+
+    const baseRequest: Omit<GenerateRequest, 'model'> = {
+        // @ts-ignore
+        prompt: promptMessages,
+        tools: extractJobDescriptionPrompt.tools,
+        toolConfig: {
+          autoCall: {
+            maxCalls: 5
+          }
+        },
+        output: {
+          schema: ExtractJobDescriptionOutputSchema,
+        },
+        // @ts-ignore
+        config: extractJobDescriptionPrompt.config,
+        // @ts-ignore - The 'input' here needs to be mapped to the prompt's handlebars
+        input, 
+    };
+
     try {
-        const { output } = await extractJobDescriptionPrompt(input);
+        const { output } = await ai.generate({
+            model: primaryModel,
+            ...baseRequest
+        });
         return output || { jobTitle: "", companyName: "", jobDescription: "" };
     } catch (e: any) {
-        // Check if the error is a resource exhausted (quota) error
         if (e.status === 429 || (e.cause as any)?.status === 429) {
-            console.warn("Primary model quota exceeded. Trying backup model.");
-            
-            // Fallback to a different model
-            const request: GenerateRequest = {
-                model: 'googleai/gemini-2.0-flash', // A different model to try
-                prompt: extractJobDescriptionPrompt.messages,
-                tools: extractJobDescriptionPrompt.tools,
-                toolConfig: {
-                  autoCall: {
-                    maxCalls: 5
-                  }
-                },
-                output: {
-                  schema: ExtractJobDescriptionOutputSchema,
-                },
-                config: extractJobDescriptionPrompt.config,
-                // @ts-ignore - The 'input' here needs to be mapped to the prompt's handlebars
-                input, 
-            };
-
-            const { output } = await ai.generate(request);
+            console.warn(`Quota exceeded for ${primaryModel}. Trying backup model ${backupModel}.`);
+            const { output } = await ai.generate({
+                model: backupModel,
+                ...baseRequest
+            });
             return output || { jobTitle: "", companyName: "", jobDescription: "" };
         }
         // Re-throw other errors
+        console.error("An unexpected error occurred during job description extraction:", e);
         throw e;
     }
   }

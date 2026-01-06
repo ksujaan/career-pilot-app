@@ -8,6 +8,7 @@ import {
   generateCustomApplicationDrafts,
   GenerateCustomApplicationDraftsOutput,
 } from "@/ai/flows/generate-custom-application-drafts";
+import { extractJobDescription } from "@/ai/flows/extract-job-description";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { Application } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -31,13 +32,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CopyButton } from "@/components/copy-button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const formSchema = z.object({
   companyName: z.string().min(2, "Company name is required"),
   jobTitle: z.string().min(2, "Job title is required"),
   jobDescription: z.string().min(50, "Job description must be at least 50 characters"),
+  jobUrl: z.string().url().optional().or(z.literal('')),
 });
 
 export default function NewApplicationPage() {
@@ -45,6 +47,7 @@ export default function NewApplicationPage() {
   const [resume] = useLocalStorage<string>("resume", "");
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [drafts, setDrafts] = useState<GenerateCustomApplicationDraftsOutput | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -53,8 +56,48 @@ export default function NewApplicationPage() {
       companyName: "",
       jobTitle: "",
       jobDescription: "",
+      jobUrl: "",
     },
   });
+
+  async function handleExtractDescription() {
+    const jobUrl = form.getValues("jobUrl");
+    if (!jobUrl) {
+        toast({
+            variant: "destructive",
+            title: "No URL provided",
+            description: "Please enter a URL to extract the job description from.",
+        });
+        return;
+    }
+
+    setIsExtracting(true);
+    try {
+        const result = await extractJobDescription({ jobUrl });
+        if (result.jobDescription) {
+            form.setValue("jobDescription", result.jobDescription);
+            toast({
+                title: "Extraction Successful",
+                description: "The job description has been extracted from the URL.",
+            });
+        } else {
+             toast({
+                variant: "destructive",
+                title: "Extraction Failed",
+                description: "Could not extract the job description. Please paste it manually.",
+            });
+        }
+    } catch (error) {
+        console.error("Failed to extract job description:", error);
+        toast({
+            variant: "destructive",
+            title: "Extraction Failed",
+            description: "An error occurred while extracting the job description. Please try again.",
+        });
+    } finally {
+        setIsExtracting(false);
+    }
+  }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!resume) {
@@ -102,7 +145,7 @@ export default function NewApplicationPage() {
         <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">New Application</h1>
             <p className="text-muted-foreground">
-                Enter the job details below to generate tailored application materials.
+                Enter job details manually or provide a URL to auto-fill the description.
             </p>
         </div>
         <Card>
@@ -143,6 +186,25 @@ export default function NewApplicationPage() {
                     )}
                   />
                 </div>
+                 <FormField
+                    control={form.control}
+                    name="jobUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job Post URL (LinkedIn, etc.)</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <FormControl>
+                            <Input placeholder="https://www.linkedin.com/jobs/view/..." {...field} />
+                            </FormControl>
+                            <Button type="button" onClick={handleExtractDescription} disabled={isExtracting} variant="outline" size="icon">
+                                {isExtracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                <span className="sr-only">Extract Job Description</span>
+                            </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 <FormField
                   control={form.control}
                   name="jobDescription"
@@ -151,7 +213,7 @@ export default function NewApplicationPage() {
                       <FormLabel>Job Description</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Paste the job description here..."
+                          placeholder="Paste the job description here, or use the extractor above."
                           className="min-h-[200px]"
                           {...field}
                         />

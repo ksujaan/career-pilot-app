@@ -39,7 +39,7 @@ export async function summarizeResume(
                     ${input.resumeText}`
                 }
             ],
-            model: "llama3-8b-8192",
+            model: "llama3-70b-8192",
             response_format: { type: "json_object" },
         });
 

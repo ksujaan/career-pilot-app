@@ -37,10 +37,8 @@ const fetchWebsiteContent = ai.defineTool(
             return "Could not fetch content.";
         }
         const text = await response.text();
-        const bodyMatch = text.match(/<body[^>]*>([\s\S]*)<\/body>/);
-        let bodyContent = bodyMatch ? bodyMatch[1] : '';
-        
-        bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        // Simple HTML to text conversion
+        let bodyContent = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
         bodyContent = bodyContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
         bodyContent = bodyContent.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
         bodyContent = bodyContent.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
@@ -50,7 +48,8 @@ const fetchWebsiteContent = ai.defineTool(
         bodyContent = bodyContent.replace(/[ \t]+/g, ' ');
         bodyContent = bodyContent.replace(/(\n\s*){3,}/g, '\n\n');
 
-        return bodyContent.substring(0, 30000); // Increased limit
+        // Limit the content to avoid being too large for the model
+        return bodyContent.substring(0, 30000); 
       } catch (e) {
           console.error(`Error fetching URL: ${e}`);
           return "Could not fetch content.";
@@ -58,58 +57,23 @@ const fetchWebsiteContent = ai.defineTool(
     }
 );
 
-function extractDetails(content: string): ExtractJobDescriptionOutput {
-    let jobTitle = "";
-    let companyName = "";
-    let jobDescription = "";
 
-    const titleRegex = [
-        /<h1[^>]*>([^<]+)<\/h1>/i,
-        /job title[:\s]+([^\n]+)/i,
-    ];
-    for (const regex of titleRegex) {
-        const match = content.match(regex);
-        if (match && match[1]) {
-            jobTitle = match[1].trim();
-            break;
-        }
-    }
+const extractJobDescriptionPrompt = ai.definePrompt({
+    name: 'extractJobDescriptionPrompt',
+    input: { schema: z.object({ jobUrl: z.string() }) },
+    output: { schema: ExtractJobDescriptionOutputSchema },
+    tools: [fetchWebsiteContent],
+    prompt: `You are an expert data extractor. A user has provided a URL to a job posting.
+    Fetch the content of the webpage using the fetchWebsiteContent tool.
+    From the content, extract the following information:
+    1.  Job Title
+    2.  Company Name
+    3.  Job Description (This is usually under a heading like "About the job", "Job details", or "Description").
 
-    const companyRegex = [
-        /company[:\s]+([^\n]+)/i,
-        /at\s+([A-Z][a-zA-Z\s&]+)/, // "at Google"
-    ];
-     for (const regex of companyRegex) {
-        const match = content.match(regex);
-        if (match && match[1]) {
-            companyName = match[1].trim();
-            break;
-        }
-    }
-
-    const descriptionRegex = [
-        /About the job\n([\s\S]+)/i,
-        /Job Description\n([\s\S]+)/i,
-        /Responsibilities\n([\s\S]+)/i,
-    ];
-
-    for (const regex of descriptionRegex) {
-        const match = content.match(regex);
-        if (match && match[1]) {
-            // Take the first big chunk of text after the header
-            jobDescription = match[1].split(/\n\s*\n/)[0].trim();
-            break;
-        }
-    }
+    Return the extracted data as a JSON object. If you cannot find a piece of information, return an empty string for that field.
     
-    // Fallback if no specific section is found
-    if (!jobDescription) {
-        jobDescription = content;
-    }
-
-    return { jobTitle, companyName, jobDescription };
-}
-
+    URL: {{{jobUrl}}}`,
+});
 
 const extractJobDescriptionFlow = ai.defineFlow(
   {
@@ -118,11 +82,8 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
-    const content = await fetchWebsiteContent({ url: input.jobUrl });
-    if (content === "Could not fetch content.") {
-        return { jobTitle: "", companyName: "", jobDescription: "" };
-    }
-    return extractDetails(content);
+    const { output } = await extractJobDescriptionPrompt(input);
+    return output || { jobTitle: "", companyName: "", jobDescription: "" };
   }
 );
 

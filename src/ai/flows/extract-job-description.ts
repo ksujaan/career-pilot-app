@@ -35,8 +35,8 @@ const extractWebsiteData = ai.defineTool(
         try {
             const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' } });
             if (!response.ok) {
-                console.error(`Error fetching URL: Status ${response.status}`);
-                return `Failed to fetch content from URL. Status: ${response.status}`;
+                // Throw an error that can be caught by the flow
+                throw new Error(`Failed to fetch content. Status: ${response.status}`);
             }
             const text = await response.text();
             
@@ -55,8 +55,9 @@ const extractWebsiteData = ai.defineTool(
             // Limit content to prevent overly large payloads to the LLM
             return content.trim().substring(0, 15000);
         } catch (e: any) {
-            console.error(`Error processing URL: ${e}`);
-            return `An error occurred while fetching the URL: ${e.message}`;
+             console.error(`Error processing URL: ${e.message}`);
+            // Re-throw the error to be handled by the flow's catch block
+            throw new Error(`An error occurred while fetching the URL: ${e.message}`);
         }
     }
 );
@@ -104,10 +105,10 @@ const extractJobDescriptionFlow = ai.defineFlow(
     try {
         const { output } = await fetchWithRetry(() => extractJobDescriptionPrompt(input, { model }));
         return output || { jobTitle: "", companyName: "", jobDescription: "" };
-    } catch (e) {
+    } catch (e: any) {
         console.error(`An unexpected error occurred during job description extraction with model ${model}:`, e);
-        // Return a default object or re-throw to be handled by the caller
-        return { jobTitle: "", companyName: "", jobDescription: "" };
+        // Re-throw the original error to be caught by the frontend
+        throw e;
     }
   }
 );

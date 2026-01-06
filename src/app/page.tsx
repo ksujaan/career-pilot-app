@@ -86,15 +86,15 @@ export default function NewApplicationPage() {
              toast({
                 variant: "destructive",
                 title: "Extraction Failed",
-                description: "Could not extract the job details. Please paste them manually.",
+                description: "Could not extract the job details. The AI was unable to parse the content. Please paste them manually.",
             });
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to extract job description:", error);
         toast({
             variant: "destructive",
             title: "Extraction Failed",
-            description: "An error occurred while extracting the job details. Please try again.",
+            description: error.message || "An unknown error occurred. Please check the console for details.",
         });
     } finally {
         setIsExtracting(false);

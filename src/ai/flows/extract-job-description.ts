@@ -80,20 +80,6 @@ const extractJobDescriptionPrompt = ai.definePrompt({
     `,
 });
 
-async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 6000): Promise<T> {
-    try {
-      return await fn();
-    } catch (e: any) {
-      const isQuotaError = (e.cause as any)?.status === 429;
-      if (isQuotaError && retries > 0) {
-        console.log(`Rate limited. Retrying in ${delay / 1000}s...`);
-        await new Promise(res => setTimeout(res, delay));
-        return fetchWithRetry(fn, retries - 1, delay * 2);
-      }
-      throw e;
-    }
-}
-
 const extractJobDescriptionFlow = ai.defineFlow(
   {
     name: 'extractJobDescriptionFlow',
@@ -101,25 +87,11 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
-    const primaryModel = 'googleai/gemini-2.5-flash';
-    const fallbackModel = 'googleai/gemini-2.0-flash';
     try {
-        const { output } = await fetchWithRetry(() => extractJobDescriptionPrompt(input, { model: primaryModel }));
+        const { output } = await extractJobDescriptionPrompt(input);
         return output || { jobTitle: "", companyName: "", jobDescription: "" };
     } catch (e: any) {
-        const isQuotaError = (e.cause as any)?.status === 429;
-        if (isQuotaError) {
-            console.warn(`Primary model ${primaryModel} failed due to quota. Trying fallback model ${fallbackModel}.`);
-            try {
-                const { output } = await fetchWithRetry(() => extractJobDescriptionPrompt(input, { model: fallbackModel }));
-                return output || { jobTitle: "", companyName: "", jobDescription: "" };
-            } catch (fallbackError: any) {
-                 console.error(`An unexpected error occurred during job description extraction with fallback model ${fallbackModel}:`, fallbackError);
-                 throw fallbackError;
-            }
-        }
-        console.error(`An unexpected error occurred during job description extraction with model ${primaryModel}:`, e);
-        // Re-throw the original error to be caught by the frontend
+        console.error(`An unexpected error occurred during job description extraction:`, e);
         throw e;
     }
   }

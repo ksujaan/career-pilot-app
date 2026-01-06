@@ -82,22 +82,14 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
-    const primaryModel = 'googleai/gemini-2.5-flash';
-    const backupModel = 'googleai/gemini-2.0-flash';
-    
+    // Using a different model directly to avoid quota issues.
+    const model = 'googleai/gemini-2.0-flash';
     try {
-        const { output } = await extractJobDescriptionPrompt(input, {model: primaryModel});
+        const { output } = await extractJobDescriptionPrompt(input, {model});
         return output || { jobTitle: "", companyName: "", jobDescription: "" };
-    } catch (e: any) {
-        const isQuotaError = (e.cause as any)?.status === 429;
-
-        if (isQuotaError) {
-            console.warn(`Quota exceeded for ${primaryModel}. Trying backup model ${backupModel}.`);
-            const { output } = await extractJobDescriptionPrompt(input, {model: backupModel});
-            return output || { jobTitle: "", companyName: "", jobDescription: "" };
-        }
-        // Re-throw other errors
-        console.error("An unexpected error occurred during job description extraction:", e);
+    } catch (e) {
+        console.error(`An unexpected error occurred during job description extraction with model ${model}:`, e);
+        // Re-throw the error to be handled by the caller, which will show a toast.
         throw e;
     }
   }

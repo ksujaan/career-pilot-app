@@ -20,17 +20,6 @@ function getStorageValue<T>(key: string, initialValue: T): T {
 export function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
   const [storedValue, setStoredValue] = useState<T>(() => getStorageValue(key, initialValue));
 
-  useEffect(() => {
-    try {
-      const item = window.localStorage.getItem(key);
-      if (item) {
-        setStoredValue(JSON.parse(item));
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  }, [key]);
-
   const setValue: SetValue<T> = (value) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
@@ -42,6 +31,18 @@ export function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T
       console.error(error);
     }
   };
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === key && e.newValue) {
+        setStoredValue(JSON.parse(e.newValue));
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [key]);
 
   return [storedValue, setValue];
 }

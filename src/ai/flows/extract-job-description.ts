@@ -33,11 +33,15 @@ const fetchWebsiteContent = ai.defineTool(
         const text = await response.text();
         const bodyMatch = text.match(/<body[^>]*>([\s\S]*)<\/body>/);
         let bodyContent = bodyMatch ? bodyMatch[1] : '';
-        // rudimentary tag stripping
+        // A more robust tag stripping process
         bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
         bodyContent = bodyContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        bodyContent = bodyContent.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
+        bodyContent = bodyContent.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
+        bodyContent = bodyContent.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
+        bodyContent = bodyContent.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
         bodyContent = bodyContent.replace(/<[^>]+>/g, '\n');
-        bodyContent = bodyContent.replace(/\s{2,}/g, ' ');
+        bodyContent = bodyContent.replace(/(\n\s*){3,}/g, '\n\n');
 
         return bodyContent.substring(0, 10000); // Limit context size
       } catch (e) {

@@ -14,14 +14,14 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UploadCloud, FileText, X, Loader2 } from "lucide-react";
-import * as pdfjs from 'pdfjs-dist';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.js';
+import { Textarea } from "@/components/ui/textarea";
 
-// Required for pdfjs-dist to work
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`;
 
 export default function ProfilePage() {
   const [resume, setResume] = useLocalStorage<string>("resume", "");
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [fileName, setFileName] = useLocalStorage<string | null>("resume-filename", null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -70,7 +70,6 @@ export default function ProfilePage() {
   const handleRemoveResume = () => {
     setResume("");
     setFileName(null);
-    // Also clear the file input
     const input = document.getElementById('resume-upload') as HTMLInputElement;
     if (input) {
       input.value = '';
@@ -98,17 +97,17 @@ export default function ProfilePage() {
               browser and used to generate tailored application materials.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <div className="grid w-full gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="resume-upload">Upload PDF</Label>
-                 {resume && fileName ? (
+                 {fileName ? (
                   <div className="flex items-center justify-between rounded-lg border bg-muted/50 p-3">
                     <div className="flex items-center gap-3">
                         <FileText className="h-6 w-6 text-primary" />
                         <span className="font-medium text-sm">{fileName}</span>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleRemoveResume}>
+                    <Button variant="ghost" size="icon" onClick={handleRemoveResume} disabled={isLoading}>
                         <X className="h-4 w-4" />
                         <span className="sr-only">Remove resume</span>
                     </Button>
@@ -135,17 +134,28 @@ export default function ProfilePage() {
                             <p className="mt-2 text-sm text-muted-foreground">
                             <span className="font-semibold text-primary">Click to upload</span> or drag and drop
                             </p>
-                            <p className="text-xs text-muted-foreground">PDF only (MAX. 5MB)</p>
+                            <p className="text-xs text-muted-foreground">PDF only</p>
                         </>
                     )}
                   </div>
                 </div>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">
+               <p className="text-sm text-muted-foreground">
                 Your resume is stored only on this device and is not sent to any server until you generate drafts.
               </p>
             </div>
+            {resume && (
+                <div className="space-y-2">
+                    <Label>Parsed Resume Content</Label>
+                    <Textarea 
+                        readOnly
+                        value={resume}
+                        className="min-h-[300px] bg-muted/50"
+                        placeholder="Parsed resume content will appear here..."
+                    />
+                </div>
+            )}
           </CardContent>
         </Card>
       </div>

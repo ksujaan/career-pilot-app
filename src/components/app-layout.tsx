@@ -50,13 +50,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center justify-between p-2">
-            <Link href="/" className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary-foreground hover:bg-sidebar-accent">
-                    <PaperPlaneIcon className="h-5 w-5"/>
-                </Button>
-                <h2 className="text-lg font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-                    CareerPilot
-                </h2>
+            <Link href="/" className="flex items-center gap-2 font-semibold text-lg text-sidebar-foreground">
+                <PaperPlaneIcon className="h-5 w-5 shrink-0 text-primary-foreground" />
+                <span className="group-data-[collapsible=icon]:hidden">CareerPilot</span>
             </Link>
             <SidebarTrigger className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden"/>
           </div>
@@ -110,7 +106,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarTrigger>
             <div className="flex items-center gap-2 font-semibold">
                 <PaperPlaneIcon className="h-5 w-5 text-primary" />
-                CareerPilot
+                <span>CareerPilot</span>
             </div>
         </header>
         <main className="flex-1 overflow-auto">{children}</main>

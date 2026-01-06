@@ -1,7 +1,8 @@
 import type {Metadata} from 'next';
 import './globals.css';
-import { AppLayout } from '@/components/app-layout';
 import { Toaster } from "@/components/ui/toaster"
+import AppLayoutClient from './app-layout-client';
+
 
 export const metadata: Metadata = {
   title: 'CareerPilot',
@@ -22,9 +23,9 @@ export default function RootLayout({
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       </head>
       <body className="font-body antialiased">
-        <AppLayout>
+        <AppLayoutClient>
           {children}
-        </AppLayout>
+        </AppLayoutClient>
         <Toaster />
       </body>
     </html>

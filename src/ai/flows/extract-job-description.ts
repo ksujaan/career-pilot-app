@@ -79,5 +79,6 @@ const extractJobDescriptionFlow = ai.defineFlow(
 export async function extractJobDescription(
   input: ExtractJobDescriptionInput
 ): Promise<ExtractJobDescriptionOutput> {
-  return extractJobDescriptionFlow(input);
+  const result = await extractJobDescriptionFlow(input);
+  return result || { jobDescription: "" };
 }

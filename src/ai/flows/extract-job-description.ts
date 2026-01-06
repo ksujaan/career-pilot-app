@@ -101,12 +101,24 @@ const extractJobDescriptionFlow = ai.defineFlow(
     outputSchema: ExtractJobDescriptionOutputSchema,
   },
   async (input) => {
-    const model = 'googleai/gemma-3-1b-it';
+    const primaryModel = 'googleai/gemini-2.5-flash';
+    const fallbackModel = 'googleai/gemini-2.0-flash';
     try {
-        const { output } = await fetchWithRetry(() => extractJobDescriptionPrompt(input, { model }));
+        const { output } = await fetchWithRetry(() => extractJobDescriptionPrompt(input, { model: primaryModel }));
         return output || { jobTitle: "", companyName: "", jobDescription: "" };
     } catch (e: any) {
-        console.error(`An unexpected error occurred during job description extraction with model ${model}:`, e);
+        const isQuotaError = (e.cause as any)?.status === 429;
+        if (isQuotaError) {
+            console.warn(`Primary model ${primaryModel} failed due to quota. Trying fallback model ${fallbackModel}.`);
+            try {
+                const { output } = await fetchWithRetry(() => extractJobDescriptionPrompt(input, { model: fallbackModel }));
+                return output || { jobTitle: "", companyName: "", jobDescription: "" };
+            } catch (fallbackError: any) {
+                 console.error(`An unexpected error occurred during job description extraction with fallback model ${fallbackModel}:`, fallbackError);
+                 throw fallbackError;
+            }
+        }
+        console.error(`An unexpected error occurred during job description extraction with model ${primaryModel}:`, e);
         // Re-throw the original error to be caught by the frontend
         throw e;
     }

@@ -4,23 +4,32 @@ import { useState, useEffect } from "react";
 
 type SetValue<T> = (value: T | ((val: T) => T)) => void;
 
+function getStorageValue<T>(key: string, initialValue: T): T {
+    if (typeof window === "undefined") {
+        return initialValue;
+    }
+    try {
+        const item = window.localStorage.getItem(key);
+        return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+        console.error(error);
+        return initialValue;
+    }
+}
+
 export function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
-  const [storedValue, setStoredValue] = useState<T>(initialValue);
+  const [storedValue, setStoredValue] = useState<T>(() => getStorageValue(key, initialValue));
 
   useEffect(() => {
     try {
       const item = window.localStorage.getItem(key);
       if (item) {
         setStoredValue(JSON.parse(item));
-      } else {
-        window.localStorage.setItem(key, JSON.stringify(initialValue));
-        setStoredValue(initialValue);
       }
     } catch (error) {
       console.error(error);
-      setStoredValue(initialValue);
     }
-  }, [key, initialValue]);
+  }, [key]);
 
   const setValue: SetValue<T> = (value) => {
     try {

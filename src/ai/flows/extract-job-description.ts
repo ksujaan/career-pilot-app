@@ -9,7 +9,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {defineTool, tool} from 'genkit';
 
 const ExtractJobDescriptionInputSchema = z.object({
   jobUrl: z.string().url().describe('The URL of the job posting.'),
@@ -29,18 +28,9 @@ const fetchWebsiteContent = ai.defineTool(
       output: {schema: z.string()},
     },
     async ({url}) => {
-      // In a real-world scenario, you would use a library like node-fetch or axios
-      // and a library like Cheerio to scrape and clean the HTML content.
-      // For this example, we'll simulate a fetch and return a placeholder.
-      // This part of the implementation would need to be built out.
-      console.log(`Fetching content from ${url}`);
-      // This is a placeholder. A real implementation would fetch the URL
-      // and extract the main content.
       try {
         const response = await fetch(url);
         const text = await response.text();
-        // A real implementation would parse the HTML and extract the relevant text.
-        // This is a simplified version.
         const bodyMatch = text.match(/<body[^>]*>([\s\S]*)<\/body>/);
         let bodyContent = bodyMatch ? bodyMatch[1] : '';
         // rudimentary tag stripping
@@ -49,14 +39,13 @@ const fetchWebsiteContent = ai.defineTool(
         bodyContent = bodyContent.replace(/<[^>]+>/g, '\n');
         bodyContent = bodyContent.replace(/\s{2,}/g, ' ');
 
-        return bodyContent.substring(0, 5000); // Limit context size
+        return bodyContent.substring(0, 10000); // Limit context size
       } catch (e) {
           console.error(`Error fetching URL: ${e}`);
           return "Could not fetch content.";
       }
     }
 );
-
 
 const extractJobDescriptionPrompt = ai.definePrompt({
   name: 'extractJobDescriptionPrompt',
@@ -67,9 +56,8 @@ const extractJobDescriptionPrompt = ai.definePrompt({
 
   Job URL: {{{jobUrl}}}
   
-  Analyze the content and identify the main job description. Exclude headers, footers, navigation bars, and any other irrelevant information. Return only the core job description text.`,
+  Analyze the content and identify the main job description. Exclude headers, footers, navigation bars, and any other irrelevant information. Return only the core job description text, including responsibilities, qualifications, and other relevant details.`,
 });
-
 
 const extractJobDescriptionFlow = ai.defineFlow(
   {

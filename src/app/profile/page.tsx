@@ -13,9 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { UploadCloud, FileText, X, Loader2 } from "lucide-react";
+import { UploadCloud, FileText, X, Loader2, Sparkles } from "lucide-react";
 import * as pdfjs from 'pdfjs-dist';
 import { Textarea } from "@/components/ui/textarea";
+import { summarizeResume } from "@/ai/flows/summarize-resume";
+import { Skeleton } from "@/components/ui/skeleton";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -24,8 +26,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 export default function ProfilePage() {
   const [resume, setResume] = useLocalStorage<string>("resume", "");
+  const [resumeSummary, setResumeSummary] = useLocalStorage<string>("resume-summary", "");
   const [fileName, setFileName] = useLocalStorage<string | null>("resume-filename", null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const { toast } = useToast();
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,28 +54,37 @@ export default function ProfilePage() {
           const text = await page.getTextContent();
           textContent += text.items.map(item => ('str' in item ? item.str : '')).join(" ") + "\n";
         }
-        setResume(textContent);
+        
+        // Start summarization
+        setIsSummarizing(true);
+        const { cleanedText, summary } = await summarizeResume({ resumeText: textContent });
+        setResume(cleanedText);
+        setResumeSummary(summary);
+
         toast({
-          title: "Resume Uploaded",
-          description: "Your resume has been successfully parsed.",
+          title: "Resume Processed",
+          description: "Your resume has been parsed and summarized.",
         });
       } catch (error) {
-        console.error("Failed to parse PDF:", error);
+        console.error("Failed to process PDF:", error);
         toast({
           variant: "destructive",
-          title: "PDF Parsing Failed",
-          description: "There was an error reading your resume. Please try again or use a different file.",
+          title: "Processing Failed",
+          description: "There was an error reading and summarizing your resume.",
         });
         setFileName(null);
         setResume("");
+        setResumeSummary("");
       } finally {
         setIsLoading(false);
+        setIsSummarizing(false);
       }
     }
   };
   
   const handleRemoveResume = () => {
     setResume("");
+    setResumeSummary("");
     setFileName(null);
     const input = document.getElementById('resume-upload') as HTMLInputElement;
     if (input) {
@@ -96,8 +109,7 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle>Master Resume/CV</CardTitle>
             <CardDescription>
-              Upload your resume as a PDF. It will be saved locally in your
-              browser and used to generate tailored application materials.
+              Upload your resume as a PDF. It will be saved locally, processed by AI to be cleaned up, and used to generate tailored application materials.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -110,7 +122,7 @@ export default function ProfilePage() {
                         <FileText className="h-6 w-6 text-primary" />
                         <span className="font-medium text-sm">{fileName}</span>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleRemoveResume} disabled={isLoading}>
+                    <Button variant="ghost" size="icon" onClick={handleRemoveResume} disabled={isLoading || isSummarizing}>
                         <X className="h-4 w-4" />
                         <span className="sr-only">Remove resume</span>
                     </Button>
@@ -123,13 +135,13 @@ export default function ProfilePage() {
                     accept="application/pdf"
                     onChange={handleFileChange}
                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    disabled={isLoading}
+                    disabled={isLoading || isSummarizing}
                   />
                   <div className="flex h-32 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-input bg-background text-center transition-colors hover:border-primary">
-                    {isLoading ? (
+                    {isLoading || isSummarizing ? (
                         <>
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            <p className="mt-2 text-sm text-muted-foreground">Processing PDF...</p>
+                            <p className="mt-2 text-sm text-muted-foreground">{isSummarizing ? "AI is processing..." : "Reading PDF..."}</p>
                         </>
                     ) : (
                         <>
@@ -148,16 +160,48 @@ export default function ProfilePage() {
                 Your resume is stored only on this device and is not sent to any server until you generate drafts.
               </p>
             </div>
-            {resume && (
-                <div className="space-y-2">
-                    <Label>Parsed Resume Content</Label>
-                    <Textarea 
-                        readOnly
-                        value={resume}
-                        className="min-h-[300px] bg-muted/50"
-                        placeholder="Parsed resume content will appear here..."
-                    />
-                </div>
+            
+            {(isLoading || isSummarizing || resume) && (
+              <div className="space-y-6">
+                {isSummarizing || resumeSummary ? (
+                   <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            AI-Generated Summary
+                        </Label>
+                        {isSummarizing ? (
+                             <Card className="p-4 bg-muted/50 space-y-2">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-4 w-1/2" />
+                            </Card>
+                        ) : resumeSummary && (
+                            <Card className="p-4 bg-muted/50">
+                                <p className="text-sm">{resumeSummary}</p>
+                            </Card>
+                        )}
+                   </div>
+                ) : null}
+
+                {isLoading || resume ? (
+                    <div className="space-y-2">
+                        <Label>Parsed & Cleaned Resume Content</Label>
+                        {isLoading && !resume ? (
+                             <Textarea 
+                                readOnly
+                                value="Parsing PDF..."
+                                className="min-h-[300px] bg-muted/50"
+                            />
+                        ) : (
+                             <Textarea 
+                                readOnly
+                                value={resume}
+                                className="min-h-[300px] bg-muted/50 whitespace-pre-wrap"
+                                placeholder="Parsed resume content will appear here..."
+                            />
+                        )}
+                    </div>
+                 ) : null}
+              </div>
             )}
           </CardContent>
         </Card>

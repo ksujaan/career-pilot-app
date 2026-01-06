@@ -32,7 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CopyButton } from "@/components/copy-button";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Send } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const formSchema = z.object({
@@ -149,13 +149,7 @@ export default function NewApplicationPage() {
             </p>
         </div>
         <Card>
-          <CardHeader>
-            <CardTitle>Job Details</CardTitle>
-            <CardDescription>
-              Fill in the information for the job you're applying for.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -196,9 +190,9 @@ export default function NewApplicationPage() {
                             <FormControl>
                             <Input placeholder="https://www.linkedin.com/jobs/view/..." {...field} />
                             </FormControl>
-                            <Button type="button" onClick={handleExtractDescription} disabled={isExtracting} variant="outline" size="icon">
-                                {isExtracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                                <span className="sr-only">Extract Job Description</span>
+                            <Button type="button" onClick={handleExtractDescription} disabled={isExtracting} variant="outline">
+                                {isExtracting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                Extract
                             </Button>
                         </div>
                         <FormMessage />
@@ -222,9 +216,9 @@ export default function NewApplicationPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Generate Drafts
+                <Button type="submit" disabled={isLoading} size="lg" className="w-full md:w-auto">
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                  Generate Application Drafts
                 </Button>
               </form>
             </Form>

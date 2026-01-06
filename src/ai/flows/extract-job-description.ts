@@ -9,7 +9,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {GenerateRequest} from '@genkit-ai/google-genai';
 
 const ExtractJobDescriptionInputSchema = z.object({
   jobUrl: z.string().url().describe('The URL of the job posting.'),
@@ -86,40 +85,15 @@ const extractJobDescriptionFlow = ai.defineFlow(
     const primaryModel = 'googleai/gemini-2.5-flash';
     const backupModel = 'googleai/gemini-2.0-flash';
     
-    // @ts-ignore
-    const promptMessages = extractJobDescriptionPrompt.messages;
-
-    const baseRequest: Omit<GenerateRequest, 'model'> = {
-        // @ts-ignore
-        prompt: promptMessages,
-        tools: extractJobDescriptionPrompt.tools,
-        toolConfig: {
-          autoCall: {
-            maxCalls: 5
-          }
-        },
-        output: {
-          schema: ExtractJobDescriptionOutputSchema,
-        },
-        // @ts-ignore
-        config: extractJobDescriptionPrompt.config,
-        // @ts-ignore - The 'input' here needs to be mapped to the prompt's handlebars
-        input, 
-    };
-
     try {
-        const { output } = await ai.generate({
-            model: primaryModel,
-            ...baseRequest
-        });
+        const { output } = await extractJobDescriptionPrompt(input, {model: primaryModel});
         return output || { jobTitle: "", companyName: "", jobDescription: "" };
     } catch (e: any) {
-        if (e.status === 429 || (e.cause as any)?.status === 429) {
+        const isQuotaError = e.status === 429 || (e.cause as any)?.status === 429;
+
+        if (isQuotaError) {
             console.warn(`Quota exceeded for ${primaryModel}. Trying backup model ${backupModel}.`);
-            const { output } = await ai.generate({
-                model: backupModel,
-                ...baseRequest
-            });
+            const { output } = await extractJobDescriptionPrompt(input, {model: backupModel});
             return output || { jobTitle: "", companyName: "", jobDescription: "" };
         }
         // Re-throw other errors

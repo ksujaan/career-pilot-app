@@ -141,22 +141,22 @@ export default function DashboardPage() {
                     <DialogHeader>
                         <DialogTitle>Application Drafts for {selectedApplication.jobTitle} at {selectedApplication.companyName}</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 h-full overflow-hidden">
-                        <div className="flex flex-col gap-2 h-full">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                        <div className="flex flex-col gap-2">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-semibold">Cover Letter</h3>
                                 <CopyButton textToCopy={selectedApplication.coverLetter} />
                             </div>
-                            <ScrollArea className="border rounded-md p-4 h-full">
+                            <ScrollArea className="border rounded-md p-4 h-full max-h-[calc(80vh-100px)]">
                                 <p className="text-sm whitespace-pre-wrap">{selectedApplication.coverLetter}</p>
                             </ScrollArea>
                         </div>
-                         <div className="flex flex-col gap-2 h-full">
+                         <div className="flex flex-col gap-2">
                              <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-semibold">Cold Email</h3>
                                 <CopyButton textToCopy={selectedApplication.coldEmail} />
                             </div>
-                            <ScrollArea className="border rounded-md p-4 h-full">
+                            <ScrollArea className="border rounded-md p-4 h-full max-h-[calc(80vh-100px)]">
                                 <p className="text-sm whitespace-pre-wrap">{selectedApplication.coldEmail}</p>
                             </ScrollArea>
                         </div>

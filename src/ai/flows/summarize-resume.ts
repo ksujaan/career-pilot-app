@@ -5,23 +5,15 @@
  * @fileOverview Cleans and summarizes resume text.
  *
  * - summarizeResume - A function that takes raw resume text, cleans it, and provides a summary.
- * - SummarizeResumeInput - The input type for the summarizeResume function.
- * - SummarizeResumeOutput - The return type for the summarizeResume function.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
-
-export const SummarizeResumeInputSchema = z.object({
-  resumeText: z.string().describe('The raw text content extracted from a resume PDF.'),
-});
-export type SummarizeResumeInput = z.infer<typeof SummarizeResumeInputSchema>;
-
-export const SummarizeResumeOutputSchema = z.object({
-  cleanedText: z.string().describe('The cleaned and formatted resume text.'),
-  summary: z.string().describe('A concise, professional summary of the candidate\'s profile.'),
-});
-export type SummarizeResumeOutput = z.infer<typeof SummarizeResumeOutputSchema>;
+import {
+    SummarizeResumeInputSchema,
+    SummarizeResumeOutputSchema,
+    type SummarizeResumeInput,
+    type SummarizeResumeOutput
+} from '@/lib/schema/resume';
 
 
 const summarizeResumePrompt = ai.definePrompt({

@@ -4,5 +4,4 @@ import {googleAI} from '@genkit-ai/google-genai';
 
 export const ai = genkit({
   plugins: [groq({apiKey: process.env.GROQ_API_KEY}), googleAI()],
-  model: 'groq/llama3-8b-8192',
 });

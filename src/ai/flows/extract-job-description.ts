@@ -88,7 +88,7 @@ const extractJobDescriptionFlow = ai.defineFlow(
   },
   async (input) => {
     try {
-        const { output } = await extractJobDescriptionPrompt(input);
+        const { output } = await extractJobDescriptionPrompt(input, { model: 'groq/llama3-8b-8192' });
         return output || { jobTitle: "", companyName: "", jobDescription: "" };
     } catch (e: any) {
         console.error(`An unexpected error occurred during job description extraction:`, e);
